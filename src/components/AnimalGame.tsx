@@ -1,37 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, X, Volume2 } from 'lucide-react';
+import { playSound, speak } from '../utils/audio';
+import { ANIMALS, ROUNDS_PER_GAME } from '../constants';
 
-const ANIMALS = [
-  { name: 'Leão', emoji: '🦁', color: 'bg-orange-100' },
-  { name: 'Elefante', emoji: '🐘', color: 'bg-blue-100' },
-  { name: 'Macaco', emoji: '🐒', color: 'bg-amber-100' },
-  { name: 'Girafa', emoji: '🦒', color: 'bg-yellow-100' },
-  { name: 'Zebra', emoji: '🦓', color: 'bg-stone-100' },
-  { name: 'Panda', emoji: '🐼', color: 'bg-slate-100' },
-  { name: 'Tigre', emoji: '🐯', color: 'bg-orange-200' },
-  { name: 'Coelho', emoji: '🐰', color: 'bg-pink-100' },
-  { name: 'Porco', emoji: '🐷', color: 'bg-pink-200' },
-  { name: 'Pinto', emoji: '🐥', color: 'bg-yellow-200' },
-  { name: 'Vaca', emoji: '🐮', color: 'bg-red-50' },
-  { name: 'Sapo', emoji: '🐸', color: 'bg-green-100' },
-];
-
-export default function AnimalGame({ onScore }: { onScore: () => void }) {
+export default function AnimalGame({ difficulty, onScore, onComplete }: { difficulty: 'easy' | 'medium' | 'hard', onScore: () => void, onComplete: () => void }) {
   const [target, setTarget] = useState(ANIMALS[0]);
   const [options, setOptions] = useState<typeof ANIMALS>([]);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [rounds, setRounds] = useState(0);
+  const [wrongId, setWrongId] = useState<string | null>(null);
 
   const generateRound = () => {
+    if (rounds >= ROUNDS_PER_GAME) {
+      onComplete();
+      return;
+    }
     const correct = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+    const optionsCount = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3;
     const others = ANIMALS
       .filter(a => a.name !== correct.name)
       .sort(() => 0.5 - Math.random())
-      .slice(0, 3);
+      .slice(0, optionsCount);
     
     setTarget(correct);
     setOptions([correct, ...others].sort(() => 0.5 - Math.random()));
     setFeedback(null);
+    setSelectedId(null);
+    setWrongId(null);
   };
 
   useEffect(() => {
@@ -39,13 +36,50 @@ export default function AnimalGame({ onScore }: { onScore: () => void }) {
   }, []);
 
   const handleChoice = (animal: typeof ANIMALS[0]) => {
+    if (selectedId || feedback === 'correct') return; // Prevent multiple clicks
+
+    const delay = difficulty === 'hard' ? 2500 : 2000;
+
     if (animal.name === target.name) {
+      setSelectedId(animal.name);
+      playSound('correct');
       setFeedback('correct');
       onScore();
-      setTimeout(generateRound, 1500);
+      setRounds(r => r + 1);
+      setTimeout(generateRound, delay);
     } else {
+      playSound('wrong');
       setFeedback('wrong');
-      setTimeout(() => setFeedback(null), 1000);
+      setWrongId(animal.name);
+      setTimeout(() => {
+        setFeedback(null);
+        setWrongId(null);
+      }, 1500);
+    }
+  };
+
+  const handlePlaySound = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    speak(target.sound);
+  };
+
+  const shakeVariants = {
+    shake: {
+      x: [0, -10, 10, -10, 10, 0],
+      transition: { duration: 0.4 }
+    }
+  };
+
+  const bounceVariants = {
+    initial: { scale: 0, opacity: 0 },
+    animate: { 
+      scale: 1, 
+      opacity: 1,
+      transition: {
+        type: "spring",
+        stiffness: 260,
+        damping: 20
+      }
     }
   };
 
@@ -57,23 +91,51 @@ export default function AnimalGame({ onScore }: { onScore: () => void }) {
     >
       <div className="text-center space-y-2">
         <h2 className="text-4xl font-black text-purple-600">Onde está o {target.name}?</h2>
-        <div className="flex justify-center">
-           <Volume2 className="w-10 h-10 text-purple-400 animate-pulse cursor-pointer" />
-        </div>
+        <motion.div 
+          key={target.name}
+          variants={bounceVariants}
+          initial="initial"
+          animate="animate"
+          className="flex justify-center"
+        >
+           <button 
+             onClick={handlePlaySound}
+             className="bg-purple-100 p-3 rounded-full hover:bg-purple-200 transition-colors kid-shadow kid-button-press"
+           >
+             <Volume2 className="w-10 h-10 text-purple-600 animate-pulse" />
+           </button>
+        </motion.div>
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full max-w-2xl relative">
-        {options.map((animal) => (
-          <motion.button
-            key={animal.name}
-            whileHover={{ scale: 1.05, rotate: 2 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => handleChoice(animal)}
-            className={`${animal.color} aspect-square rounded-[40px] kid-shadow kid-button-press flex flex-col items-center justify-center border-8 border-white`}
-          >
-            <span className="text-8xl drop-shadow-sm">{animal.emoji}</span>
-          </motion.button>
-        ))}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-2xl relative">
+        {options.map((animal) => {
+          const isCorrect = animal.name === target.name;
+          const isSelected = animal.name === selectedId;
+          const isWrong = animal.name === wrongId;
+          const showHighlight = selectedId !== null || isWrong;
+
+          return (
+            <motion.button
+              key={animal.name}
+              whileHover={{ scale: 1.05, rotate: 2 }}
+              whileTap={{ scale: 0.95 }}
+              variants={shakeVariants}
+              animate={isWrong ? "shake" : (showHighlight && isCorrect ? {
+                scale: [1, 1.1, 1],
+                boxShadow: "0 0 20px rgba(34, 197, 94, 0.6)"
+              } : {})}
+              transition={showHighlight && isCorrect ? { repeat: Infinity, duration: 1 } : {}}
+              onClick={() => handleChoice(animal)}
+              className={`${animal.color} aspect-square rounded-[40px] kid-shadow kid-button-press flex flex-col items-center justify-center border-8 ${
+                showHighlight && isCorrect ? 'border-green-400' : 
+                isWrong ? 'border-red-400' : 'border-white'
+              }`}
+            >
+              <span className="text-8xl drop-shadow-sm">{animal.emoji}</span>
+            </motion.button>
+          );
+        })}
+
 
         <AnimatePresence>
           {feedback && (

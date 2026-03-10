@@ -2,25 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, X } from 'lucide-react';
 
+import { ROUNDS_PER_GAME } from '../constants';
+import { playSound } from '../utils/audio';
+
 const NUMBER_EMOJIS = ['🐱', '🐶', '🐥', '🐠', '🐰', '🦁', '🐸', '🐼', '🦊'];
 
-export default function NumberGame({ onScore }: { onScore: () => void }) {
+export default function NumberGame({ difficulty, onScore, onComplete }: { difficulty: 'easy' | 'medium' | 'hard', onScore: () => void, onComplete: () => void }) {
   const [count, setCount] = useState(0);
   const [options, setOptions] = useState<number[]>([]);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [emoji, setEmoji] = useState('');
+  const [rounds, setRounds] = useState(0);
+  const [wrongId, setWrongId] = useState<number | null>(null);
 
   const generateRound = () => {
+    if (rounds >= ROUNDS_PER_GAME) {
+      onComplete();
+      return;
+    }
     const newCount = Math.floor(Math.random() * 9) + 1;
+    const optionsCount = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3;
     const others = [1, 2, 3, 4, 5, 6, 7, 8, 9]
       .filter(n => n !== newCount)
       .sort(() => 0.5 - Math.random())
-      .slice(0, 2);
+      .slice(0, optionsCount);
     
     setCount(newCount);
     setOptions([newCount, ...others].sort(() => 0.5 - Math.random()));
     setEmoji(NUMBER_EMOJIS[Math.floor(Math.random() * NUMBER_EMOJIS.length)]);
     setFeedback(null);
+    setWrongId(null);
   };
 
   useEffect(() => {
@@ -28,13 +39,44 @@ export default function NumberGame({ onScore }: { onScore: () => void }) {
   }, []);
 
   const handleChoice = (num: number) => {
+    if (feedback === 'correct') return;
+
+    const delay = difficulty === 'hard' ? 2000 : 1500;
+
     if (num === count) {
+      playSound('correct');
       setFeedback('correct');
       onScore();
-      setTimeout(generateRound, 1500);
+      setRounds(r => r + 1);
+      setTimeout(generateRound, delay);
     } else {
+      playSound('wrong');
       setFeedback('wrong');
-      setTimeout(() => setFeedback(null), 1000);
+      setWrongId(num);
+      setTimeout(() => {
+        setFeedback(null);
+        setWrongId(null);
+      }, 1000);
+    }
+  };
+
+  const shakeVariants = {
+    shake: {
+      x: [0, -10, 10, -10, 10, 0],
+      transition: { duration: 0.4 }
+    }
+  };
+
+  const bounceVariants = {
+    initial: { scale: 0, opacity: 0 },
+    animate: { 
+      scale: 1, 
+      opacity: 1,
+      transition: {
+        type: "spring",
+        stiffness: 260,
+        damping: 20
+      }
     }
   };
 
@@ -47,7 +89,13 @@ export default function NumberGame({ onScore }: { onScore: () => void }) {
       <h2 className="text-3xl font-bold text-green-600">Quantos animais você vê?</h2>
       
       <div className="relative min-h-[300px] flex items-center justify-center">
-        <div className="grid grid-cols-3 gap-6 p-10 bg-white rounded-[40px] kid-shadow max-w-md border-8 border-green-100">
+        <motion.div 
+          key={count}
+          variants={bounceVariants}
+          initial="initial"
+          animate="animate"
+          className="grid grid-cols-3 gap-6 p-10 bg-white rounded-[40px] kid-shadow max-w-md border-8 border-green-100"
+        >
           {Array.from({ length: count }).map((_, i) => (
             <motion.span
               key={i}
@@ -64,7 +112,7 @@ export default function NumberGame({ onScore }: { onScore: () => void }) {
               {emoji}
             </motion.span>
           ))}
-        </div>
+        </motion.div>
 
         <AnimatePresence>
           {feedback && (
@@ -86,14 +134,18 @@ export default function NumberGame({ onScore }: { onScore: () => void }) {
         </AnimatePresence>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-wrap justify-center">
         {options.map((opt) => (
           <motion.button
             key={opt}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
+            variants={shakeVariants}
+            animate={wrongId === opt ? "shake" : ""}
             onClick={() => handleChoice(opt)}
-            className="w-20 h-20 bg-green-400 text-white text-4xl font-black rounded-2xl kid-shadow kid-button-press"
+            className={`w-20 h-20 text-white text-4xl font-black rounded-2xl kid-shadow kid-button-press ${
+              wrongId === opt ? 'bg-red-400' : 'bg-green-400'
+            }`}
           >
             {opt}
           </motion.button>

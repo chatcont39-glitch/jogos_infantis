@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, X } from 'lucide-react';
-import { ALPHABET_DATA, ROUNDS_PER_GAME } from '../constants';
+import { COLORS_DATA, ROUNDS_PER_GAME } from '../constants';
 import { playSound } from '../utils/audio';
 
-export default function AlphabetGame({ difficulty, onScore, onComplete }: { difficulty: 'easy' | 'medium' | 'hard', onScore: () => void, onComplete: () => void }) {
-  const [current, setCurrent] = useState(ALPHABET_DATA[0]);
-  const [options, setOptions] = useState<string[]>([]);
+export default function ColorGame({ difficulty, onScore, onComplete }: { difficulty: 'easy' | 'medium' | 'hard', onScore: () => void, onComplete: () => void }) {
+  const [current, setCurrent] = useState(COLORS_DATA[0]);
+  const [options, setOptions] = useState<typeof COLORS_DATA>([]);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [rounds, setRounds] = useState(0);
   const [wrongId, setWrongId] = useState<string | null>(null);
@@ -16,16 +16,15 @@ export default function AlphabetGame({ difficulty, onScore, onComplete }: { diff
       onComplete();
       return;
     }
-    const correct = ALPHABET_DATA[Math.floor(Math.random() * ALPHABET_DATA.length)];
+    const correct = COLORS_DATA[Math.floor(Math.random() * COLORS_DATA.length)];
     const optionsCount = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3;
-    const others = ALPHABET_DATA
-      .filter(a => a.letter !== correct.letter)
+    const others = COLORS_DATA
+      .filter(c => c.name !== correct.name)
       .sort(() => 0.5 - Math.random())
-      .slice(0, optionsCount)
-      .map(a => a.letter);
+      .slice(0, optionsCount);
     
     setCurrent(correct);
-    setOptions([correct.letter, ...others].sort(() => 0.5 - Math.random()));
+    setOptions([correct, ...others].sort(() => 0.5 - Math.random()));
     setFeedback(null);
     setWrongId(null);
   };
@@ -34,12 +33,12 @@ export default function AlphabetGame({ difficulty, onScore, onComplete }: { diff
     generateRound();
   }, []);
 
-  const handleChoice = (letter: string) => {
+  const handleChoice = (colorName: string) => {
     if (feedback === 'correct') return;
 
     const delay = difficulty === 'hard' ? 2000 : 1500;
 
-    if (letter === current.letter) {
+    if (colorName === current.name) {
       playSound('correct');
       setFeedback('correct');
       onScore();
@@ -48,7 +47,7 @@ export default function AlphabetGame({ difficulty, onScore, onComplete }: { diff
     } else {
       playSound('wrong');
       setFeedback('wrong');
-      setWrongId(letter);
+      setWrongId(colorName);
       setTimeout(() => {
         setFeedback(null);
         setWrongId(null);
@@ -82,18 +81,18 @@ export default function AlphabetGame({ difficulty, onScore, onComplete }: { diff
       animate={{ opacity: 1, scale: 1 }}
       className="flex flex-col items-center gap-8"
     >
-      <h2 className="text-3xl font-bold text-blue-600">Qual é a letra inicial?</h2>
+      <h2 className="text-3xl font-bold text-pink-600">Qual é a cor da {current.object}?</h2>
       
       <div className="relative">
         <motion.div
-          key={current.animal}
+          key={current.name}
           variants={bounceVariants}
           initial="initial"
           animate="animate"
-          className={`w-64 h-64 ${current.color} rounded-[40px] p-4 kid-shadow flex flex-col items-center justify-center gap-2 border-8 border-white`}
+          className="w-64 h-64 bg-white rounded-[40px] p-4 kid-shadow flex flex-col items-center justify-center gap-2 border-8 border-pink-100"
         >
           <span className="text-9xl drop-shadow-md">{current.emoji}</span>
-          <span className="text-3xl font-black text-stone-700 uppercase tracking-tighter">{current.animal}</span>
+          <span className="text-3xl font-black text-stone-700 uppercase tracking-tighter">{current.object}</span>
         </motion.div>
 
         <AnimatePresence>
@@ -119,17 +118,15 @@ export default function AlphabetGame({ difficulty, onScore, onComplete }: { diff
       <div className="flex gap-4 flex-wrap justify-center">
         {options.map((opt) => (
           <motion.button
-            key={opt}
+            key={opt.name}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             variants={shakeVariants}
-            animate={wrongId === opt ? "shake" : ""}
-            onClick={() => handleChoice(opt)}
-            className={`w-20 h-20 text-white text-4xl font-black rounded-2xl kid-shadow kid-button-press ${
-              wrongId === opt ? 'bg-red-400' : 'bg-blue-400'
-            }`}
+            animate={wrongId === opt.name ? "shake" : ""}
+            onClick={() => handleChoice(opt.name)}
+            className={`w-24 h-24 rounded-3xl kid-shadow kid-button-press border-4 border-white flex flex-col items-center justify-center gap-1 ${opt.color}`}
           >
-            {opt}
+            <span className="text-white font-black text-sm uppercase">{opt.name}</span>
           </motion.button>
         ))}
       </div>
