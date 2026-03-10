@@ -1,0 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Fredoka", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-amber-50 text-stone-800 overflow-hidden;
+  }
+}
+
+.kid-shadow {
+  box-shadow: 0 8px 0 rgba(0,0,0,0.1);
+}
+
+.kid-button-press:active {
+  transform: translateY(4px);
+  box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+}
